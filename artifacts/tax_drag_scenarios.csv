@@ -1,0 +1,25 @@
+ttl,tax_rate,pre_tax_cagr,post_tax_cagr,cagr_drag,turnover,notes
+30,0.0,0.2356560330268343,0.2356560330268343,0.0,0.6,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+60,0.0,0.2405137924563708,0.2405137924563708,0.0,0.3,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+90,0.0,0.2426284481140927,0.2426284481140927,0.0,0.2,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+120,0.0,0.2435,0.2435,0.0,0.15,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+180,0.0,0.2425137924563708,0.2425137924563708,0.0,0.1,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+365,0.0,0.21972640270219554,0.21972640270219554,0.0,0.049315068493150684,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+30,0.1,0.2356560330268343,0.17540467678269844,0.060251356244135856,0.6,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+60,0.1,0.2405137924563708,0.22514045148480016,0.015373340971570643,0.3,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+90,0.1,0.2426284481140927,0.23573577828391817,0.00689266983017453,0.2,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+120,0.1,0.2435,0.23960894609375,0.003891053906249997,0.15,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+180,0.1,0.2425137924563708,0.24079143929286295,0.001722353163507856,0.1,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+365,0.1,0.21972640270219554,0.2193468891483596,0.0003795135538359473,0.049315068493150684,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+30,0.2,0.2356560330268343,0.11515332053856259,0.12050271248827171,0.6,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+60,0.2,0.2405137924563708,0.2097671105132295,0.030746681943141313,0.3,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+90,0.2,0.2426284481140927,0.22884310845374367,0.013785339660349033,0.2,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+120,0.2,0.2435,0.2357178921875,0.007782107812499994,0.15,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+180,0.2,0.2425137924563708,0.2390690861293551,0.003444706327015712,0.1,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+365,0.2,0.21972640270219554,0.21896737559452362,0.0007590271076719224,0.049315068493150684,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+30,0.3,0.2356560330268343,0.05490196429442673,0.18075406873240757,0.6,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+60,0.3,0.2405137924563708,0.19439376954165885,0.046120022914711956,0.3,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+90,0.3,0.2426284481140927,0.22195043862356914,0.020678009490523563,0.2,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+120,0.3,0.2435,0.23182683828125,0.011673161718749991,0.15,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+180,0.3,0.2425137924563708,0.23734673296584727,0.00516705949052354,0.1,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.
+365,0.3,0.21972640270219554,0.21858786204068767,0.0011385406615078697,0.049315068493150684,Gains realized on sale/reduction are taxed through a turnover-scaled gain proxy; losses are not refunded.

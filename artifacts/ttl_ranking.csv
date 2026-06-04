@@ -1,0 +1,7 @@
+rank,ttl,score,reason
+1,180,96.6667,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.2383, Sharpe=1.264, turnover=0.1000."
+2,120,93.2181,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.2339, Sharpe=1.229, turnover=0.1500."
+3,365,92.1182,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.2188, Sharpe=1.172, turnover=0.0493."
+4,90,88.478,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.2256, Sharpe=1.175, turnover=0.2000."
+5,60,76.916,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.2025, Sharpe=1.036, turnover=0.3000."
+6,30,27.7815,"Fixed audit score = 45% post-friction CAGR, 35% Sharpe, 20% lower-turnover robustness; CAGR=0.0859, Sharpe=0.417, turnover=0.6000."

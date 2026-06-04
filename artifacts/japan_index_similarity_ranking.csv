@@ -1,0 +1,5 @@
+rank,index_name,similarity_score,reason
+1,TOPIX100,58.78,"Jaccard-style score from 77 overlapping tickers; lumus_overlap_ratio=0.712963, index_overlap_ratio=0.77."
+2,JPX Prime150,48.28,"Jaccard-style score from 84 overlapping tickers; lumus_overlap_ratio=0.777778, index_overlap_ratio=0.56."
+3,Nikkei225,40.51,"Jaccard-style score from 96 overlapping tickers; lumus_overlap_ratio=0.888889, index_overlap_ratio=0.426667."
+4,TOPIX Core30,23.21,"Jaccard-style score from 26 overlapping tickers; lumus_overlap_ratio=0.240741, index_overlap_ratio=0.866667."

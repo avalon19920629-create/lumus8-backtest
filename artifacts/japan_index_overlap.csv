@@ -1,0 +1,5 @@
+index_name,index_constituent_count,lumus_constituent_count,overlap_count,lumus_overlap_ratio,index_overlap_ratio,missing_from_lumus_count,extra_in_lumus_count,notes
+TOPIX Core30,30,108,26,0.240741,0.866667,4,82,Measured against current-only proxy constituent seed; not historical truth.
+TOPIX100,100,108,77,0.712963,0.77,23,31,Measured against current-only proxy constituent seed; not historical truth.
+JPX Prime150,150,108,84,0.777778,0.56,66,24,Measured against current-only proxy constituent seed; not historical truth.
+Nikkei225,225,108,96,0.888889,0.426667,129,12,Measured against current-only proxy constituent seed; not historical truth.

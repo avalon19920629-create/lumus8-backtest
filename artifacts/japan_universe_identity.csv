@@ -1,0 +1,9 @@
+dimension,rating,evidence,notes
+large-cap bias,high,Closest measured proxy is TOPIX100 with score 58.78; all candidate indices are large-cap/current-index universes.,This supports a large-cap identity rather than a broad all-Japan universe.
+quality bias,high,Static list plus high overlap with current major-index proxy constituents excludes failed/delisted names.,"Quality bias is inferred from current-survivor construction, not from fundamentals."
+liquidity bias,high,Candidate overlaps are with liquid blue-chip index families; small illiquid listings are absent.,"Liquidity proxies were not fetched, so rating remains conservative but qualitative."
+exporter bias,medium,"Universe includes autos, electronics, machinery, precision equipment, and trading companies.",Requires sector/factor metadata for precise quantification.
+semiconductor bias,high,"Manual list includes 8035.T, 6857.T, 6146.T, 6723.T, 6920.T, 7735.T and other semiconductor/equipment-linked names.","This is visible from ticker composition, but sector source validation is still needed."
+financial-sector bias,medium,"Universe includes megabanks, insurers, brokers/financials such as 8306.T, 8316.T, 8411.T, 8766.T, 8750.T, 8591.T.","Not necessarily excessive, but clearly present."
+industrial-sector bias,high,"Universe includes construction, machinery, heavy industry, shipping, steel, trading houses and infrastructure names.",Sector metadata is needed for exact weights.
+custom manual universe identity,high,Top proxy TOPIX100 has only 77 overlaps out of 108 L.U.M.U.S. names; not a complete clone of any candidate index.,The universe most resembles a TOPIX100-style blue-chip subset but remains manually selected.
