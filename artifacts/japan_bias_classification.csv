@@ -1,0 +1,10 @@
+bias_dimension,rating,reason,evidence
+survivor-only risk,high,Manual list contains only currently listed tickers.,integration/lumus8_current_screening.py:get_tickers_lumus():jp_tickers
+large-cap bias,high,"Ticker set is dominated by famous Japanese blue chips and liquid megacaps by construction/appearance, but market-cap metadata was not validated.",Static ticker composition plus missing small-cap/delisted coverage.
+quality bias,high,Manual curation likely favors surviving high-quality firms and excludes historical failures.,Survivorship risk rows and absence of delisted constituents.
+liquidity bias,medium,"The list appears to prefer liquid well-known names, but liquidity proxies were not fetched.",Manual ticker list; profile liquidity_proxy fields unknown.
+famous-company/manual-selection bias,high,Universe definition is a hard-coded curated list rather than a published rule-based index file.,integration/lumus8_current_screening.py:get_tickers_lumus():jp_tickers
+sector concentration risk,unknown,Sector data was not reliably obtained; unknown-sector ratio is 100% in this phase.,artifacts/japan_sector_concentration.csv
+historical delisting omission risk,critical,There is no JP historical membership/delisting engine; major disappeared firms are absent by design.,artifacts/japan_survivorship_risk.csv
+reproducibility risk,medium,"The list is reproducible as code, but the selection rationale is not documented as an external rule set.",integration/lumus8_current_screening.py:get_tickers_lumus():jp_tickers
+point-in-time validity risk,critical,A current manual list cannot be treated as rebalance-date historical truth.,No Japanese historical universe engine present.

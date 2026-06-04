@@ -1,0 +1,5 @@
+source_name,source_url,accessed_at,fields_used,license_uncertain,notes
+L.U.M.U.S.-8 Japanese universe artifact/code,artifacts/japan_lumus_universe.csv; integration/lumus8_current_screening.py,2026-06-03,"ticker, normalized_ticker",false,Local reproducible current-only manual universe.
+JPX TOPIX Core30 / TOPIX100 index-family reference,https://www.jpx.co.jp/english/markets/indices/line-up/index.html,2026-06-03,current-only proxy constituent seed for overlap audit,true,Validated official member downloads were not imported; proxy seed is not historical truth.
+JPX Prime 150 official reference,https://www.jpx.co.jp/english/markets/indices/jpx-prime150/,2026-06-03,current-only proxy constituent seed for overlap audit,true,Constituent list/weights should be replaced by official downloaded file before production use.
+Nikkei 225 official component reference,https://indexes.nikkei.co.jp/en/nkave/index/component?idx=nk225,2026-06-03,current-only proxy constituent seed for overlap audit,true,Current-only reference; not a historical membership source.
