@@ -71,3 +71,22 @@ periodic contribution or cash-flow ledger, New-money-only is disclosed but not m
 The audit uses the repository's historical sleeve proxies IEF/GLD/BTC-USD for
 BNDX/GLDM/BTC and therefore begins only when every required asset (including XLRE) has
 a valid observation.
+
+## Allocation robustness preliminary audit
+
+`allocation_robustness_audit.py` compares the current fixed allocation with a small,
+predefined set of growth, defense, real-asset, TLT, BNDX-proxy, BTC, simplified, and
+near-current variants. It applies the L.U.M.U.S.-8 ±5 percentage-point core / ±10
+percentage-point support thresholds plus year-end rebalancing, and records a GENKI-style
+simple average-cost tax estimate and trading friction. This is a robustness audit, not
+an allocation optimizer.
+
+```bash
+python allocation_robustness_audit.py --start 2010-01-01 --end 2026-06-30 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --output-dir artifacts/allocation_audit
+```
+
+The Japanese summary and requested CSV/PNG artifacts are written under the selected
+output directory. As in the GENKI audit, IEF/GLD/BTC-USD provide the long-history
+proxies for BNDX/GLDM/BTC; the report explicitly discloses this limitation.
