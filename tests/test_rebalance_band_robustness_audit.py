@@ -13,9 +13,14 @@ def sample_prices():
     return pd.DataFrame(100 * np.cumprod(1 + returns, axis=0), index=dates, columns=ASSETS)
 
 
-def test_eight_predefined_policies_cover_requested_variants():
-    assert len(POLICIES) == 8
-    assert {p.year_end_rule for p in POLICIES.values()} == {"annual", "none", "biennial", "conditional", "loss_only"}
+def test_existing_eight_and_simplification_policies_cover_requested_variants():
+    existing = {CURRENT_POLICY, "Loose_7_5_12_5_Annual", "Looser_10_15_Annual", "Threshold_Only",
+                "Biennial_Year_End", "Conditional_Year_End", "Loss_Harvest_Year_End", "Sell_Suppressed"}
+    requested = {CURRENT_POLICY, "Annual_Only", "Annual_Only_Loss_Harvest", "Annual_Only_Conditional",
+                 "SemiAnnual_Only", "Quarterly_Only", "Threshold_Only"}
+    assert existing <= set(POLICIES)
+    assert requested <= set(POLICIES)
+    assert len(POLICIES) == 13
     assert sum(p.sell_suppression for p in POLICIES.values()) == 1
 
 
@@ -33,6 +38,32 @@ def test_threshold_only_has_no_year_end_events():
     assert all(event["reason"] == "threshold" for event in result.events)
 
 
+def test_annual_only_never_triggers_threshold_and_rebalances_only_at_year_end():
+    result = simulate(sample_prices(), "Annual_Only", POLICIES["Annual_Only"])
+    assert result.events
+    assert all(event["reason"] == "annual_annual" for event in result.events)
+    assert all((event["date"] + pd.offsets.BDay()).year > event["date"].year for event in result.events)
+
+
+def test_semiannual_and_quarterly_only_rebalance_at_requested_period_ends():
+    prices = sample_prices()
+    semi = simulate(prices, "SemiAnnual_Only", POLICIES["SemiAnnual_Only"])
+    quarterly = simulate(prices, "Quarterly_Only", POLICIES["Quarterly_Only"])
+    assert all(event["reason"] == "semiannual_periodic" for event in semi.events)
+    assert all(event["reason"] == "quarterly_periodic" for event in quarterly.events)
+    assert all(((event["date"] + pd.offsets.BDay()).year, ((event["date"] + pd.offsets.BDay()).month - 1) // 6)
+               != (event["date"].year, (event["date"].month - 1) // 6) for event in semi.events)
+    assert all(((event["date"] + pd.offsets.BDay()).year, (event["date"] + pd.offsets.BDay()).quarter)
+               != (event["date"].year, event["date"].quarter) for event in quarterly.events)
+    assert len(quarterly.events) >= len(semi.events)
+
+
+def test_annual_only_loss_harvest_generates_at_least_as_much_realized_loss():
+    plain = simulate(sample_prices(), "Annual_Only", POLICIES["Annual_Only"], enable_tax_loss_carryforward=True)
+    harvest = simulate(sample_prices(), "Annual_Only_Loss_Harvest", POLICIES["Annual_Only_Loss_Harvest"], enable_tax_loss_carryforward=True)
+    assert harvest.realized_loss >= plain.realized_loss
+
+
 def test_required_metrics_artifacts_and_japanese_report(tmp_path):
     tables = run_audit(sample_prices(), tmp_path, fee_bps=1)
     required = ["rebalance_band_summary_report_ja.md", "rebalance_band_metrics.csv", "rebalance_band_annual_returns.csv",
@@ -44,7 +75,8 @@ def test_required_metrics_artifacts_and_japanese_report(tmp_path):
     assert expected <= set(tables["metrics"].columns)
     assert set(tables["metrics"].Decision) <= DECISIONS
     report = (tmp_path / "rebalance_band_summary_report_ja.md").read_text(encoding="utf-8")
-    for section in ["【結論】", "【比較サマリー】", "【年次勝敗・ローリング勝率】", "【判定基準】", "【重要な制約】"]:
+    for section in ["【結論】", "【年末1回リバランス検証】", "【単純化による効果】", "【単純化による副作用】",
+                    "【比較サマリー】", "【年次勝敗・ローリング勝率】", "【判定基準】", "【重要な制約】"]:
         assert section in report
 
 
@@ -74,9 +106,10 @@ def test_carryforward_mode_outputs_metrics_artifacts_and_required_report_section
                 "TaxSavedByCarryforward", "TaxCostBeforeCarryforward", "TaxCostAfterCarryforward",
                 "CarryforwardAdjustedAfterTaxCAGR", "CarryforwardAdjustedAfterTaxCalmar", "CarryforwardAdjustedCostDragCAGR"}
     assert expected <= set(tables["metrics"].columns)
-    assert len(tables["metrics"]) == 8
+    assert len(tables["metrics"]) == 13
     report = (tmp_path / "rebalance_band_loss_carryforward_summary_report.md").read_text(encoding="utf-8")
-    for section in ["【結論】", "【前回監査との差分】", "【損失繰越モデルの説明】", "【比較サマリー】", "【損失繰越効果】",
+    for section in ["【結論】", "【前回監査との差分】", "【損失繰越モデルの説明】", "【年末1回リバランス検証】",
+                    "【単純化による効果】", "【単純化による副作用】", "【比較サマリー】", "【損失繰越効果】",
                     "【税後・コスト後評価】", "【リバランス負荷】", "【ドローダウン耐性】", "【採用判断】", "【重要な制約】"]:
         assert section in report
     assert "税務助言ではなく" in report
