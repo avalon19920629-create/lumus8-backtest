@@ -109,3 +109,21 @@ python growth_heavy_decomposition_audit.py --start 2015-10-08 --end 2026-06-06 \
 A 2010 start is accepted, but the report discloses the later all-asset common start
 forced by assets such as BTC-USD and XLRE. The output directory receives the Japanese
 summary, metrics, annual returns, rebalance events, equity/drawdown CSVs, and charts.
+
+## Rebalance-band robustness preliminary audit
+
+`rebalance_band_robustness_audit.py` keeps the current normalized L.U.M.U.S.-8 allocation
+fixed and compares eight predefined band/year-end policies, including conditional,
+biennial, loss-position-only, and minimum-sale rebalancing. It reports after-tax return,
+drawdown, risk ratios, turnover, trade/tax counts, tax cost, 2022 resilience, annual
+wins/losses, and rolling three-/five-year win rates.
+
+```bash
+python rebalance_band_robustness_audit.py --start 2010-01-01 --end 2026-06-06 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --output-dir artifacts/rebalance_band_audit
+```
+
+The output directory receives CSV tables, PNG charts, price coverage, and a Japanese
+summary report with an explicit adoption classification. The historical proxy and
+simplified average-cost tax-model limitations are disclosed in the report.
