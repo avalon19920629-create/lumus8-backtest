@@ -90,3 +90,22 @@ python allocation_robustness_audit.py --start 2010-01-01 --end 2026-06-30 \
 The Japanese summary and requested CSV/PNG artifacts are written under the selected
 output directory. As in the GENKI audit, IEF/GLD/BTC-USD provide the long-history
 proxies for BNDX/GLDM/BTC; the report explicitly discloses this limitation.
+
+## Growth_Heavy decomposition preliminary audit
+
+`growth_heavy_decomposition_audit.py` decomposes the previous audit's Growth_Heavy
+result with twelve predefined counterfactual allocations. It separately probes VT,
+BTC, defense, TLT, and SHY changes while retaining the same threshold/year-end
+rebalancing and simplified after-tax cost ledger. The fixed candidate grid is not
+optimized from historical prices, and the result is explicitly an input to further
+validation rather than a live-allocation change.
+
+```bash
+python growth_heavy_decomposition_audit.py --start 2015-10-08 --end 2026-06-06 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --output-dir artifacts/growth_decomposition
+```
+
+A 2010 start is accepted, but the report discloses the later all-asset common start
+forced by assets such as BTC-USD and XLRE. The output directory receives the Japanese
+summary, metrics, annual returns, rebalance events, equity/drawdown CSVs, and charts.
