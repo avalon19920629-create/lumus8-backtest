@@ -37,6 +37,7 @@ class RebalancePolicy:
     threshold_enabled: bool = True
     periodic_frequency: str = "annual"
     loss_harvest: bool = False
+    conditional_year_end_fraction: float = .5
 
 
 POLICIES: dict[str, RebalancePolicy] = {
@@ -53,6 +54,18 @@ POLICIES: dict[str, RebalancePolicy] = {
     "Annual_Only_Conditional": RebalancePolicy("年末条件付きのみ：最大乖離がバンドの50%以上のとき", .05, .10, "conditional", threshold_enabled=False),
     "SemiAnnual_Only": RebalancePolicy("半年に1回のみ：臨時リバランスなし", .05, .10, "periodic", threshold_enabled=False, periodic_frequency="semiannual"),
     "Quarterly_Only": RebalancePolicy("四半期に1回のみ：臨時リバランスなし", .05, .10, "periodic", threshold_enabled=False, periodic_frequency="quarterly"),
+}
+
+
+CONDITIONAL_THRESHOLD_FRACTIONS = (.25, .50, .75, 1.00, 1.25)
+CONDITIONAL_THRESHOLD_POLICIES: dict[str, RebalancePolicy] = {
+    CURRENT_POLICY: POLICIES[CURRENT_POLICY],
+    **{f"Conditional_Year_End_{int(fraction * 100)}": RebalancePolicy(
+        f"年末条件付き：最大乖離がバンドの{fraction:.0%}以上のときのみ", .05, .10, "conditional",
+        conditional_year_end_fraction=fraction,
+    ) for fraction in CONDITIONAL_THRESHOLD_FRACTIONS},
+    "Threshold_Only": POLICIES["Threshold_Only"],
+    "Annual_Only": POLICIES["Annual_Only"],
 }
 
 
@@ -127,6 +140,7 @@ class AuditResult:
     tax_loss_expired: float = 0.0
     tax_cost_before_carryforward: float = 0.0
     tax_cost_after_carryforward: float = 0.0
+    max_observed_drift: float = 0.0
 
 
 def _bands(policy: RebalancePolicy) -> pd.Series:
@@ -193,7 +207,7 @@ def _periodic_trigger(policy: RebalancePolicy, date: pd.Timestamp, drift: pd.Ser
     if policy.year_end_rule in {"annual", "periodic"}: return True
     if policy.year_end_rule == "none": return False
     if policy.year_end_rule == "biennial": return date.year % 2 == 0
-    if policy.year_end_rule == "conditional": return bool((drift.abs() >= bands * .5).any())
+    if policy.year_end_rule == "conditional": return bool((drift.abs() >= bands * policy.conditional_year_end_fraction).any())
     if policy.year_end_rule == "loss_only": return bool((values < basis - 1e-12).any())
     raise ValueError(f"Unknown periodic rule: {policy.year_end_rule}")
 
@@ -206,11 +220,12 @@ def simulate(prices: pd.DataFrame, name: str, policy: RebalancePolicy, tax_rate:
     cf_values = target.copy(); cf_basis = target.copy(); ledger = TaxLossCarryforwardLedger(tax_rate)
     bands = _bands(policy); net_points = []; gross_points = []; cf_points = []; events = []
     turnover = tax = slippage = fees = realized_gains = realized_losses = 0.0; trade_count = 0
-    annual_gain = annual_loss = 0.0
+    annual_gain = annual_loss = 0.0; max_observed_drift = 0.0
     for i, date in enumerate(panel.index):
         if i:
             relative = panel.iloc[i] / panel.iloc[i - 1]; values *= relative; gross_values *= relative; cf_values *= relative
-        current = values / values.sum(); drift = current - target; breached = (drift.abs() > bands) if policy.threshold_enabled else pd.Series(False, index=ASSETS)
+        current = values / values.sum(); drift = current - target; max_observed_drift = max(max_observed_drift, float(drift.abs().max()))
+        breached = (drift.abs() > bands) if policy.threshold_enabled else pd.Series(False, index=ASSETS)
         is_year_end = i < len(panel) - 1 and panel.index[i + 1].year != date.year
         periodic_due = _period_end_due(policy, panel, i) and _periodic_trigger(policy, date, drift, bands, values, basis)
         if bool(breached.any()) or periodic_due:
@@ -234,7 +249,7 @@ def simulate(prices: pd.DataFrame, name: str, policy: RebalancePolicy, tax_rate:
     net = pd.Series(dict(net_points), name=name); gross = pd.Series(dict(gross_points), name=name); cf = pd.Series(dict(cf_points), name=name)
     return AuditResult(net / net.iloc[0], gross / gross.iloc[0], events, turnover, tax, slippage, fees, trade_count,
                        cf / cf.iloc[0] if enable_tax_loss_carryforward else None, ledger.events, realized_gains, realized_losses,
-                       ledger.total_generated, ledger.total_used, ledger.total_expired, ledger.total_tax_before, ledger.total_tax_after)
+                       ledger.total_generated, ledger.total_used, ledger.total_expired, ledger.total_tax_before, ledger.total_tax_after, max_observed_drift)
 
 
 def _cagr(equity: pd.Series) -> float:
@@ -273,7 +288,7 @@ def _classify(name: str, row: Mapping[str, float], base: Mapping[str, float], ca
     return "不採用"
 
 
-def build_tables(results: Mapping[str, AuditResult]) -> dict[str, pd.DataFrame]:
+def build_tables(results: Mapping[str, AuditResult], policies: Mapping[str, RebalancePolicy] = POLICIES) -> dict[str, pd.DataFrame]:
     equities = pd.DataFrame({n: r.equity for n, r in results.items()}); gross = pd.DataFrame({n: r.gross_equity for n, r in results.items()})
     cf_enabled = all(r.carryforward_equity is not None for r in results.values())
     cf_equities = pd.DataFrame({n: r.carryforward_equity for n, r in results.items()}) if cf_enabled else equities.copy()
@@ -281,14 +296,17 @@ def build_tables(results: Mapping[str, AuditResult]) -> dict[str, pd.DataFrame]:
     rows = {}; baseline_annual = annual[CURRENT_POLICY]
     for name, result in results.items():
         net, pre, cf = _ratio_metrics(result.equity), _ratio_metrics(result.gross_equity), _ratio_metrics(cf_equities[name]); excess = annual[name] - baseline_annual
-        rows[name] = {"Description": POLICIES[name].description, "CoreBand": POLICIES[name].core_band, "SupportBand": POLICIES[name].support_band,
+        rows[name] = {"Description": policies[name].description, "CoreBand": policies[name].core_band, "SupportBand": policies[name].support_band,
+          "ConditionalThresholdFraction": policies[name].conditional_year_end_fraction,
           "PreTaxCAGR": pre["CAGR"], "AfterTaxCAGR": net["CAGR"], "MaxDD": cf["MaxDD"] if cf_enabled else net["MaxDD"], "AfterTaxCalmar": net["Calmar"],
           "CarryforwardAdjustedAfterTaxCAGR": cf["CAGR"], "CarryforwardAdjustedAfterTaxCalmar": cf["Calmar"], "Sharpe": cf["Sharpe"], "Sortino": cf["Sortino"],
           "Turnover": result.turnover, "TradeCount": result.trade_count, "RebalanceCount": len(result.events), "AnnualRebalanceCount": len(result.events) / years,
+          "YearEndRebalanceCount": sum(e["reason"] != "threshold" for e in result.events), "MaxObservedDrift": result.max_observed_drift,
           "TaxableEventCount": sum(e["tax_cost"] > 0 for e in result.events), "TaxCost": result.tax_cost, "RealizedGainBeforeOffset": result.realized_gain_before_offset,
           "RealizedLoss": result.realized_loss, "TaxLossGenerated": result.tax_loss_generated, "TaxLossUsed": result.tax_loss_used, "TaxLossExpired": result.tax_loss_expired,
           "TaxSavedByCarryforward": 0.0,  # overwritten below from annual ledger events
-          "TaxCostBeforeCarryforward": result.tax_cost_before_carryforward, "TaxCostAfterCarryforward": result.tax_cost_after_carryforward,
+          "TaxCostBeforeCarryforward": result.tax_cost_before_carryforward if cf_enabled else result.tax_cost,
+          "TaxCostAfterCarryforward": result.tax_cost_after_carryforward if cf_enabled else result.tax_cost,
           "Slippage": result.slippage, "Fees": result.fees, "CostDragCAGR": pre["CAGR"] - net["CAGR"], "CarryforwardAdjustedCostDragCAGR": pre["CAGR"] - cf["CAGR"],
           "Return2022": float(annual.loc[2022, name]) if 2022 in annual.index else np.nan, "Excess2022VsCurrent": float(excess.loc[2022]) if 2022 in excess.index else np.nan,
           "AnnualWins": int((excess > 1e-12).sum()), "AnnualLosses": int((excess < -1e-12).sum()), "AnnualTies": int(np.isclose(excess, 0).sum()),
@@ -353,6 +371,100 @@ def _plots(tables: Mapping[str, pd.DataFrame], output_dir: Path, carryforward: b
         fig = ax[0].figure; fig.tight_layout(); fig.savefig(output_dir / "trading_tax_burden.png", dpi=150); plt.close(fig)
 
 
+def _conditional_threshold_decision(name: str, row: Mapping[str, float], base: Mapping[str, float],
+                                    carryforward: bool) -> str:
+    if name == CURRENT_POLICY:
+        return "現行リバランス維持"
+    if not name.startswith("Conditional_Year_End_"):
+        return "不採用"
+    cagr_key = "CarryforwardAdjustedAfterTaxCAGR" if carryforward else "AfterTaxCAGR"
+    calmar_key = "CarryforwardAdjustedAfterTaxCalmar" if carryforward else "AfterTaxCalmar"
+    risk_ok = (row["MaxDD"] >= base["MaxDD"] - .01
+               and (np.isnan(row["Excess2022VsCurrent"]) or row["Excess2022VsCurrent"] >= -.01)
+               and row[calmar_key] >= base[calmar_key] * .95)
+    tax_cost_key = "TaxCostAfterCarryforward" if carryforward else "TaxCost"
+    burden_lower = (row["Turnover"] < base["Turnover"] and row["TradeCount"] < base["TradeCount"]
+                    and row["RebalanceCount"] < base["RebalanceCount"]
+                    and row[tax_cost_key] < base[tax_cost_key] - 1e-12)
+    if not risk_ok:
+        return "年末リバランス抑制しすぎ"
+    if row[cagr_key] >= base[cagr_key] and row[calmar_key] >= base[calmar_key] and burden_lower:
+        return "年末条件付き化候補" if row[cagr_key] >= base[cagr_key] + .001 else "条件付き閾値追加検証候補"
+    if row[cagr_key] >= base[cagr_key] - .001 and burden_lower:
+        return "条件付き閾値追加検証候補"
+    return "不採用"
+
+
+def write_conditional_threshold_report(tables: Mapping[str, pd.DataFrame], output_dir: Path, start: pd.Timestamp,
+                                       end: pd.Timestamp, tax_rate: float, slippage_bps: float, fee_bps: float,
+                                       carryforward: bool) -> None:
+    metrics = tables["metrics"]; base = metrics.loc[CURRENT_POLICY]
+    conditional_names = [name for name in metrics.index if name.startswith("Conditional_Year_End_")]
+    conditional = metrics.loc[conditional_names]
+    primary_cagr = "CarryforwardAdjustedAfterTaxCAGR" if carryforward else "AfterTaxCAGR"
+    primary_calmar = "CarryforwardAdjustedAfterTaxCalmar" if carryforward else "AfterTaxCalmar"
+    best = str(conditional[primary_calmar].idxmax())
+    robust_count = int(conditional.Decision.isin({"年末条件付き化候補", "条件付き閾値追加検証候補"}).sum())
+    stability = (f"{robust_count}/{len(conditional)}閾値が耐性・負担軽減条件を概ね満たすため、閾値変更に対して比較的安定している。"
+                 if robust_count >= 3 else f"候補判定は{robust_count}/{len(conditional)}閾値に限られ、特定閾値依存の可能性がある。")
+    fifty = metrics.loc["Conditional_Year_End_50"]
+    fifty_text = ("50%閾値も候補群に含まれ、単一閾値だけの偶然とは言い切れない。"
+                  if robust_count >= 3 and fifty["Decision"] != "不採用" else "50%閾値の優位は周辺閾値で十分再現されず、偶然依存を否定できない。")
+    strong = conditional[conditional.Decision == "年末条件付き化候補"]
+    overall = "年末条件付き化候補" if not strong.empty else "現行リバランス維持"
+    overall_reason = (f"{strong.index[0]} は年0.10%以上の改善と負担低下を満たしたが、即採用せず追加検証する。"
+                      if not strong.empty else "改善が軽微、横一線、または安定性条件が不足するため現行ホメオスタシスを優先する。")
+    comparison_columns = [primary_cagr, primary_calmar, "MaxDD", "Turnover", "TradeCount", "RebalanceCount",
+                          "YearEndRebalanceCount", "TaxCostAfterCarryforward", "Return2022", "MaxObservedDrift"]
+    comparison = conditional[comparison_columns].subtract(base[comparison_columns])
+    comparison.columns = [f"{column}ChangeVsCurrent" for column in comparison.columns]
+    burden = metrics.loc[[CURRENT_POLICY, *conditional_names, "Threshold_Only", "Annual_Only"],
+                         ["YearEndRebalanceCount", "TradeCount", "Turnover", "TaxCost", "TaxCostAfterCarryforward", "Slippage", "Fees"]]
+    lines = ["# Conditional Year-End Rebalance 閾値感度監査", "", "## 【結論】",
+             f"**{overall}** — {overall_reason}",
+             f"主判定指標の税後Calmarが最も高い閾値は **{best}**。ただし年0.10%未満の差や横一線では現行リバランス維持を優先する。",
+             stability, fifty_text, "25%の低い閾値は年末売買を残しやすく、125%の高い閾値はThreshold_Onlyに近づいて固定比率復元力を弱めうる。",
+             "本監査結果だけで現行ルールを直ちに変更しない。", "",
+             "## 【検証目的】", "臨時リバランスを暴走防止装置として維持したまま、不要な年末売買だけを条件付きで抑制できるかを確認する。", "",
+             "## 【比較対象】", _report_table(metrics[["Description", "Decision"]]), "",
+             "## 【閾値感度サマリー】", _report_table(conditional[[primary_cagr, primary_calmar, "MaxDD", "YearEndRebalanceCount", "Turnover", "Return2022", "Decision"]]), "",
+             "## 【現行リバランスとの比較】", "正値は現行より増加、負値は減少を示す。", _report_table(comparison), "",
+             "## 【税後・損失繰越込み評価】", _report_table(metrics[["AfterTaxCAGR", "CarryforwardAdjustedAfterTaxCAGR", "AfterTaxCalmar", "CarryforwardAdjustedAfterTaxCalmar", "TaxLossGenerated", "TaxLossUsed", "TaxLossExpired", "TaxSavedByCarryforward", "CostDragCAGR", "CarryforwardAdjustedCostDragCAGR"]]), "",
+             "## 【売買回数・課税負荷】", _report_table(burden), "",
+             "## 【2022年耐性】", _report_table(metrics[["Return2022", "Excess2022VsCurrent", "MaxDD", "Sharpe", "Sortino"]]), "",
+             "## 【年末リバランス抑制の副作用】", "閾値が高いほど年末復元が減る。MaxObservedDriftを役割分散・固定比率復元力の代理指標として併記し、MaxDD、2022年耐性、Calmar、ローリング勝率の悪化を確認する。",
+             _report_table(metrics[["MaxObservedDrift", "MaxDD", primary_calmar, "Return2022", "Rolling3YWinRate", "Rolling5YWinRate"]]), "",
+             "## 【採用判断】", _report_table(metrics[["Decision"]]), "",
+             "## 【重要な制約】", f"- 検証期間: {start.date()}〜{end.date()}。税率={tax_rate:.3%}、スリッページ={slippage_bps:g}bps、手数料={fee_bps:g}bps。",
+             "- 本監査は過去データに基づく予備監査であり、将来の成果を保証しない。",
+             "- 税モデルは簡易平均取得価額と年間ネット損益方式による近似である。",
+             "- 実際の税務判断には、確定申告、損益通算対象、配当課税方式、口座区分、損失繰越の制度要件が関係する。税務助言ではない。",
+             "- BNDX/GLDM/BTC等には代理資産制約がある。", "- 差が軽微なら、理解しやすく既存運用と整合する現行リバランス維持を優先する。"]
+    (output_dir / "conditional_threshold_summary_report.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def run_conditional_threshold_audit(raw_prices: pd.DataFrame, output_dir: Path, tax_rate: float = .20315,
+                                    slippage_bps: float = 5, fee_bps: float = 0,
+                                    enable_tax_loss_carryforward: bool = False) -> dict[str, pd.DataFrame]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    prices, coverage = prepare_prices(raw_prices); prices = prices.loc[:, ASSETS].dropna()
+    results = {name: simulate(prices, name, policy, tax_rate, slippage_bps, fee_bps, enable_tax_loss_carryforward)
+               for name, policy in CONDITIONAL_THRESHOLD_POLICIES.items()}
+    tables = build_tables(results, CONDITIONAL_THRESHOLD_POLICIES); base = tables["metrics"].loc[CURRENT_POLICY]
+    tables["metrics"]["Decision"] = [_conditional_threshold_decision(name, row, base, enable_tax_loss_carryforward)
+                                      for name, row in tables["metrics"].iterrows()]
+    files = {"metrics": "conditional_threshold_metrics.csv", "rebalance_events": "conditional_threshold_rebalance_events.csv",
+             "tax_loss_events": "conditional_threshold_tax_loss_events.csv", "annual_returns": "conditional_threshold_annual_returns.csv",
+             "equity_curves": "conditional_threshold_equity_curves.csv", "drawdown_curves": "conditional_threshold_drawdown_curves.csv"}
+    for key, filename in files.items():
+        tables[key].to_csv(output_dir / filename, index=key not in {"rebalance_events", "tax_loss_events"},
+                           index_label="policy" if key == "metrics" else "date")
+    coverage.to_csv(output_dir / "price_coverage.csv", index_label="ticker")
+    _plots(tables, output_dir, True)
+    write_conditional_threshold_report(tables, output_dir, prices.index[0], prices.index[-1], tax_rate, slippage_bps, fee_bps, enable_tax_loss_carryforward)
+    return tables
+
+
 def run_audit(raw_prices: pd.DataFrame, output_dir: Path, tax_rate: float = .20315, slippage_bps: float = 5,
               fee_bps: float = 0, enable_tax_loss_carryforward: bool = False) -> dict[str, pd.DataFrame]:
     output_dir.mkdir(parents=True, exist_ok=True); prices, coverage = prepare_prices(raw_prices); prices = prices.loc[:, ASSETS].dropna()
@@ -374,10 +486,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--start", default="2010-01-01"); parser.add_argument("--end", default=None)
     parser.add_argument("--tax-rate", type=float, default=.20315); parser.add_argument("--slippage-bps", type=float, default=5); parser.add_argument("--fee-bps", type=float, default=0)
     parser.add_argument("--enable-tax-loss-carryforward", action="store_true", help="Enable annual-netting three-year tax-loss carryforward approximation")
-    parser.add_argument("--output-dir", type=Path, default=Path("artifacts/rebalance_band_audit")); args = parser.parse_args()
-    raw = download_prices(ASSETS, args.start, args.end, args.output_dir / "price_cache")
-    tables = run_audit(raw, args.output_dir, args.tax_rate, args.slippage_bps, args.fee_bps, args.enable_tax_loss_carryforward)
-    print(tables["metrics"].to_string()); print(f"Artifacts saved under: {args.output_dir.resolve()}")
+    parser.add_argument("--run-conditional-threshold-sweep", action="store_true", help="Run the independent conditional year-end threshold sensitivity audit")
+    parser.add_argument("--output-dir", type=Path, default=None); args = parser.parse_args()
+    output_dir = args.output_dir or Path("artifacts/rebalance_condition_threshold_audit" if args.run_conditional_threshold_sweep else "artifacts/rebalance_band_audit")
+    raw = download_prices(ASSETS, args.start, args.end, output_dir / "price_cache")
+    runner = run_conditional_threshold_audit if args.run_conditional_threshold_sweep else run_audit
+    tables = runner(raw, output_dir, args.tax_rate, args.slippage_bps, args.fee_bps, args.enable_tax_loss_carryforward)
+    print(tables["metrics"].to_string()); print(f"Artifacts saved under: {output_dir.resolve()}")
 
 
 if __name__ == "__main__": main()

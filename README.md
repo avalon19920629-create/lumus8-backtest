@@ -150,3 +150,27 @@ The carryforward run writes the Japanese loss-carryforward summary, policy metri
 tax-loss events, rebalance events, annual returns, equity curves, and equity/drawdown
 charts. Real-data execution requires an environment that can connect to Yahoo Finance;
 the test suite uses synthetic prices to validate the model and artifact path offline.
+
+### Conditional Year-End Threshold Sweep
+
+The independent Conditional Year-End Threshold Sweep keeps the current core ±5-point
+and support ±10-point emergency rebalance bands enabled, while comparing year-end
+rebalance triggers at 25%, 50%, 75%, 100%, and 125% of each asset's applicable band.
+`Threshold_Only` and `Annual_Only` are included as reference cases. The primary adoption
+judgment uses the tax-loss-carryforward-adjusted results; if the differences are small
+or effectively tied, the existing annual rebalance is preferred to preserve the
+understandable fixed-weight homeostasis.
+
+```bash
+python rebalance_band_robustness_audit.py \
+  --start 2015-10-08 --end 2026-06-06 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --enable-tax-loss-carryforward \
+  --run-conditional-threshold-sweep \
+  --output-dir artifacts/rebalance_condition_threshold_audit
+```
+
+The sweep writes `conditional_threshold_summary_report.md`, metrics, rebalance and
+tax-loss events, annual returns, equity/drawdown CSVs, and PNG charts. Real-data
+execution requires an environment that can connect to Yahoo Finance; synthetic-price
+tests validate the sweep and artifact generation when provider access is unavailable.

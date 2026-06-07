@@ -2,11 +2,14 @@ import numpy as np
 import pandas as pd
 
 from allocation_robustness_audit import ASSETS
-from rebalance_band_robustness_audit import CURRENT_POLICY, DECISIONS, POLICIES, _bands, _minimum_trade_weights, run_audit, simulate
+from rebalance_band_robustness_audit import (
+    CONDITIONAL_THRESHOLD_POLICIES, CURRENT_POLICY, DECISIONS, POLICIES, _bands, _minimum_trade_weights,
+    run_audit, run_conditional_threshold_audit, simulate,
+)
 
 
-def sample_prices():
-    dates = pd.bdate_range("2015-10-08", periods=2200)
+def sample_prices(periods=2200):
+    dates = pd.bdate_range("2015-10-08", periods=periods)
     rng = np.random.default_rng(812)
     returns = rng.normal(.00018, .008, (len(dates), len(ASSETS)))
     returns[:, ASSETS.index("BTC-USD")] += .00015
@@ -113,3 +116,49 @@ def test_carryforward_mode_outputs_metrics_artifacts_and_required_report_section
                     "【税後・コスト後評価】", "【リバランス負荷】", "【ドローダウン耐性】", "【採用判断】", "【重要な制約】"]:
         assert section in report
     assert "税務助言ではなく" in report
+
+
+def test_conditional_threshold_policies_keep_current_emergency_bands_enabled():
+    for threshold in (25, 50, 75, 100):
+        policy = CONDITIONAL_THRESHOLD_POLICIES[f"Conditional_Year_End_{threshold}"]
+        assert policy.threshold_enabled
+        assert policy.year_end_rule == "conditional"
+        assert policy.conditional_year_end_fraction == threshold / 100
+
+
+def test_conditional_threshold_only_suppresses_year_end_and_is_monotonic():
+    prices = sample_prices(); shocked = prices.copy()
+    shocked.loc[shocked.index[100]:, "BTC-USD"] *= 20
+    counts = []
+    for threshold in (25, 50, 75, 100, 125):
+        name = f"Conditional_Year_End_{threshold}"
+        policy = CONDITIONAL_THRESHOLD_POLICIES[name]
+        shocked_result = simulate(shocked, name, policy)
+        result = simulate(prices, name, policy)
+        assert any(event["reason"] == "threshold" for event in shocked_result.events)
+        assert all(event["reason"] in {"threshold", "annual_conditional"} for event in result.events)
+        counts.append(sum(event["reason"] == "annual_conditional" for event in result.events))
+    assert counts == sorted(counts, reverse=True)
+
+
+def test_conditional_threshold_sweep_carryforward_artifacts_and_report(tmp_path):
+    tables = run_conditional_threshold_audit(sample_prices(600), tmp_path, enable_tax_loss_carryforward=True)
+    required = ["conditional_threshold_summary_report.md", "conditional_threshold_metrics.csv",
+                "conditional_threshold_rebalance_events.csv", "conditional_threshold_tax_loss_events.csv",
+                "conditional_threshold_annual_returns.csv", "conditional_threshold_equity_curves.csv",
+                "conditional_threshold_drawdown_curves.csv", "equity_curve.png", "drawdown_curve.png"]
+    assert all((tmp_path / name).is_file() for name in required)
+    assert set(CONDITIONAL_THRESHOLD_POLICIES) == set(tables["metrics"].index)
+    assert {"YearEndRebalanceCount", "MaxObservedDrift", "TaxCostAfterCarryforward"} <= set(tables["metrics"].columns)
+    report = (tmp_path / "conditional_threshold_summary_report.md").read_text(encoding="utf-8")
+    for section in ["【結論】", "【検証目的】", "【比較対象】", "【閾値感度サマリー】", "【現行リバランスとの比較】",
+                    "【税後・損失繰越込み評価】", "【売買回数・課税負荷】", "【2022年耐性】",
+                    "【年末リバランス抑制の副作用】", "【採用判断】", "【重要な制約】"]:
+        assert section in report
+
+
+def test_conditional_threshold_sweep_supports_standard_tax_model(tmp_path):
+    tables = run_conditional_threshold_audit(sample_prices(600), tmp_path)
+    assert tables["metrics"]["AfterTaxCAGR"].notna().all()
+    assert (tmp_path / "conditional_threshold_tax_loss_events.csv").is_file()
+    assert (tmp_path / "conditional_threshold_summary_report.md").is_file()
