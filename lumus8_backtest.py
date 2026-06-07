@@ -146,7 +146,7 @@ def download_prices(
 def prepare_prices(raw_prices: pd.DataFrame, max_ffill_days: int = MAX_FORWARD_FILL_DAYS) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fill only short internal gaps and return a ticker-level coverage report.
 
-    Leading/trailing gaps remain missing. A portfolio starts only after all of its
+    Leading and long trailing gaps remain missing. A portfolio starts only after all of its
     assets have valid prices, avoiding backfilled pre-inception performance.
     """
     if raw_prices.empty:
@@ -158,7 +158,9 @@ def prepare_prices(raw_prices: pd.DataFrame, max_ffill_days: int = MAX_FORWARD_F
         original = raw_prices[ticker].dropna()
         if original.empty:
             raise ValueError(f"{ticker} has no usable prices")
-        internal = raw_prices[ticker].loc[original.index.min(): original.index.max()]
+        # Include the trailing calendar so a short provider gap after the latest
+        # observation is handled consistently with other short internal gaps.
+        internal = raw_prices[ticker].loc[original.index.min():]
         filled = internal.ffill(limit=max_ffill_days)
         cleaned[ticker] = filled.reindex(raw_prices.index)
         coverage_rows.append({
@@ -166,7 +168,7 @@ def prepare_prices(raw_prices: pd.DataFrame, max_ffill_days: int = MAX_FORWARD_F
             "FirstValidDate": original.index.min(),
             "LastValidDate": original.index.max(),
             "RawObservations": len(original),
-            "FilledInternalGaps": int(filled.notna().sum() - internal.notna().sum()),
+            "FilledInternalGaps": int(filled.loc[:original.index.max()].notna().sum() - internal.loc[:original.index.max()].notna().sum()),
             "RemainingMissing": int(filled.isna().sum()),
         })
     return pd.DataFrame(cleaned), pd.DataFrame(coverage_rows).set_index("Ticker")
@@ -378,8 +380,10 @@ def correlation_analysis(
     if correlation.isna().any().any():
         raise ValueError("Cannot cluster assets with undefined return correlations")
 
-    distance = (1.0 - correlation).clip(lower=0.0)
-    np.fill_diagonal(distance.values, 0.0)
+    distance = (1.0 - correlation).clip(lower=0.0).copy()
+    distance_values = distance.to_numpy(copy=True)
+    np.fill_diagonal(distance_values, 0.0)
+    distance = pd.DataFrame(distance_values, index=distance.index, columns=distance.columns)
     condensed_distance = squareform(distance, checks=True)
     assignment_tables = []
     prefix = f"{file_stem}_" if file_stem else ""
