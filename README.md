@@ -127,3 +127,26 @@ python rebalance_band_robustness_audit.py --start 2010-01-01 --end 2026-06-06 \
 The output directory receives CSV tables, PNG charts, price coverage, and a Japanese
 summary report with an explicit adoption classification. The historical proxy and
 simplified average-cost tax-model limitations are disclosed in the report.
+
+### Tax-loss carryforward rebalance audit (Japan-inspired approximation)
+
+The rebalance-band audit can optionally compare the same eight policies with an
+annual-netting, three-year `tax_loss_pool` approximation. A net realized loss in year
+Y is available to offset net realized gains in Y+1 through Y+3; the oldest pool is used
+first, and any unused balance expires after Y+3. This is a deliberately simplified
+backtest model inspired by Japan's listed-securities loss carryforward framework, not
+tax advice and not a complete reproduction of filing requirements, eligible income,
+account types, or dividend-tax elections.
+
+```bash
+python rebalance_band_robustness_audit.py \
+  --start 2015-10-08 --end 2026-06-06 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --enable-tax-loss-carryforward \
+  --output-dir artifacts/rebalance_band_audit_loss_carryforward
+```
+
+The carryforward run writes the Japanese loss-carryforward summary, policy metrics,
+tax-loss events, rebalance events, annual returns, equity curves, and equity/drawdown
+charts. Real-data execution requires an environment that can connect to Yahoo Finance;
+the test suite uses synthetic prices to validate the model and artifact path offline.

@@ -46,3 +46,37 @@ def test_required_metrics_artifacts_and_japanese_report(tmp_path):
     report = (tmp_path / "rebalance_band_summary_report_ja.md").read_text(encoding="utf-8")
     for section in ["【結論】", "【比較サマリー】", "【年次勝敗・ローリング勝率】", "【判定基準】", "【重要な制約】"]:
         assert section in report
+
+
+def test_tax_loss_pool_generation_use_expiry_and_savings():
+    from rebalance_band_robustness_audit import TaxLossCarryforwardLedger
+
+    ledger = TaxLossCarryforwardLedger(.20)
+    assert ledger.settle_year(2022, 0, 100) == 0
+    assert ledger.pools == [{"origin_year": 2022, "expiry_year": 2025, "amount": 100}]
+    assert ledger.settle_year(2023, 40, 0) == 0
+    assert ledger.total_used == 40
+    assert ledger.events[-1]["tax_saved_by_carryforward"] == 8
+    ledger.settle_year(2024, 0, 0)
+    ledger.settle_year(2025, 0, 0)
+    assert ledger.total_expired == 60
+    assert not ledger.pools
+
+
+def test_carryforward_mode_outputs_metrics_artifacts_and_required_report_sections(tmp_path):
+    tables = run_audit(sample_prices(), tmp_path, enable_tax_loss_carryforward=True)
+    required = ["rebalance_band_loss_carryforward_summary_report.md", "rebalance_band_loss_carryforward_metrics.csv",
+                "rebalance_band_loss_carryforward_tax_loss_events.csv", "rebalance_band_loss_carryforward_rebalance_events.csv",
+                "rebalance_band_loss_carryforward_annual_returns.csv", "rebalance_band_loss_carryforward_equity_curves.csv",
+                "equity_curve.png", "drawdown_curve.png"]
+    assert all((tmp_path / name).is_file() for name in required)
+    expected = {"RealizedGainBeforeOffset", "RealizedLoss", "TaxLossGenerated", "TaxLossUsed", "TaxLossExpired",
+                "TaxSavedByCarryforward", "TaxCostBeforeCarryforward", "TaxCostAfterCarryforward",
+                "CarryforwardAdjustedAfterTaxCAGR", "CarryforwardAdjustedAfterTaxCalmar", "CarryforwardAdjustedCostDragCAGR"}
+    assert expected <= set(tables["metrics"].columns)
+    assert len(tables["metrics"]) == 8
+    report = (tmp_path / "rebalance_band_loss_carryforward_summary_report.md").read_text(encoding="utf-8")
+    for section in ["【結論】", "【前回監査との差分】", "【損失繰越モデルの説明】", "【比較サマリー】", "【損失繰越効果】",
+                    "【税後・コスト後評価】", "【リバランス負荷】", "【ドローダウン耐性】", "【採用判断】", "【重要な制約】"]:
+        assert section in report
+    assert "税務助言ではなく" in report
