@@ -49,3 +49,25 @@ Contribution reports use each Core variant's actual modeled beginning-of-day wei
 ## VNQ-versus-XLRE sleeve audit
 
 `LUMUS_VNQ` preserves the existing BTC-enabled Core allocation. `LUMUS_XLRE` changes only the 6% real-estate sleeve from VNQ to XLRE before the original 90% allocation is normalized. The dedicated `real_estate_variant_*` reports intentionally use a shared XLRE-compatible start date, preventing the longer VNQ history from biasing the direct comparison. Existing benchmark and phase-2 reports remain available unchanged.
+
+## GENKI dynamic-conditioning preliminary audit
+
+`genki_backtest.py` compares the threshold-rebalanced Base Strategy with Conservative
+and Standard GENKI variants. The historical proxy uses trailing-only momentum,
+200-day moving-average distance, drawdown, and volatility to rank role groups before
+applying a conserved, bounded temporary target tilt. Year-end restores the base target.
+The simulator reports both gross and after-tax results using an explicitly simplified
+average-cost tax model and configurable slippage/fees.
+
+```bash
+python genki_backtest.py --start 2010-01-01 --end 2026-06-30 \
+  --tax-rate 0.20315 --slippage-bps 5 --fee-bps 0 \
+  --output-dir artifacts/genki_audit
+```
+
+The audit writes the requested Japanese summary, metrics, annual returns, tilt-event
+log, equity curves, and drawdown/equity charts. Because the existing model has no
+periodic contribution or cash-flow ledger, New-money-only is disclosed but not modeled.
+The audit uses the repository's historical sleeve proxies IEF/GLD/BTC-USD for
+BNDX/GLDM/BTC and therefore begins only when every required asset (including XLRE) has
+a valid observation.
