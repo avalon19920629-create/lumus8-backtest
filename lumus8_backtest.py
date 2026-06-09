@@ -29,6 +29,12 @@ PORTFOLIOS: dict[str, dict[str, float]] = {
     "SP500": {"SPY": 1.0},
     "60_40": {"SPY": 0.60, "IEF": 0.40},
     "DALIO_AW": {"SPY": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
+    "LUMUS_GROWTH_SPY_QQQ_50_50": {"SPY": 0.50, "QQQ": 0.50},
+    # Formal ex-Alpha baseline: replace the 15% Alpha Engine growth sleeve with VT.
+    "LUMUS_EX_ALPHA_VT_REPLACED": {
+        "VT": 0.30, "BNDX": 0.075, "TLT": 0.125, "TIP": 0.10, "GLD": 0.10,
+        "XLRE": 0.10, "DBC": 0.05, "SHY": 0.12, "BTC-USD": 0.03,
+    },
     # The original weights sum to 90%; normalization is deliberate and reported.
     "LUMUS_CORE_WITH_BTC": {
         "VT": 0.25, "IEF": 0.10, "TLT": 0.12, "TIP": 0.10, "GLD": 0.10,
@@ -50,8 +56,10 @@ PORTFOLIOS: dict[str, dict[str, float]] = {
     },
 }
 
+FORMAL_BASELINE = "LUMUS_EX_ALPHA_VT_REPLACED"
+LEGACY_SAMPLE_PORTFOLIOS = ("LUMUS_CORE_WITH_BTC", "LUMUS_XLRE")
 LUMUS_ASSETS = list(PORTFOLIOS["LUMUS_CORE_WITH_BTC"])
-CORE_COMPARISON_PORTFOLIOS = ("SP500", "60_40", "DALIO_AW", "LUMUS_CORE_WITH_BTC", "LUMUS_CORE_NO_BTC")
+CORE_COMPARISON_PORTFOLIOS = ("SP500", "60_40", "DALIO_AW", FORMAL_BASELINE, *LEGACY_SAMPLE_PORTFOLIOS)
 REAL_ESTATE_VARIANTS = ("LUMUS_VNQ", "LUMUS_XLRE")
 REAL_ESTATE_ASSETS = {name: list(PORTFOLIOS[name]) for name in REAL_ESTATE_VARIANTS}
 REAL_ESTATE_AUDIT_ASSETS = list(dict.fromkeys(
@@ -477,6 +485,96 @@ def real_estate_variant_audit(
     return tables
 
 
+def _metric_summary(table: pd.DataFrame, name: str) -> str:
+    row = table.loc[name]
+    return (
+        f"CAGR {row['CAGR']:.2%}、Volatility {row['Volatility']:.2%}、"
+        f"MaxDD {row['MaxDD']:.2%}、Sharpe {row['Sharpe']:.2f}、Calmar {row['Calmar']:.2f}"
+    )
+
+
+def write_ex_alpha_report(tables: Mapping[str, pd.DataFrame], output_dir: Path) -> None:
+    """Write the research report for the formal ex-Alpha / VT-replaced baseline."""
+    common = tables["common_period_metrics"]
+    stress = tables["stress_periods"]
+    annual = tables["annual_returns"]
+    start = pd.Timestamp(common.loc[FORMAL_BASELINE, "StartDate"]).date()
+    end = pd.Timestamp(common.loc[FORMAL_BASELINE, "EndDate"]).date()
+    comparison_lines = [
+        f"- **{name}**: {_metric_summary(common, name)}"
+        for name in (FORMAL_BASELINE, "SP500", "60_40", "DALIO_AW")
+    ]
+    year_2022 = annual.loc[2022] if 2022 in annual.index else pd.Series(dtype=float)
+    year_lines = [f"- **{name}**: {year_2022[name]:.2%}" for name in CORE_COMPARISON_PORTFOLIOS if name in year_2022]
+    inflation = stress.loc["INFLATION_2022"] if "INFLATION_2022" in stress.index else pd.DataFrame()
+    stress_lines = []
+    for name in (FORMAL_BASELINE, "60_40", "DALIO_AW", "SP500"):
+        if name in inflation.index and bool(inflation.loc[name, "Available"]):
+            row = inflation.loc[name]
+            stress_lines.append(
+                f"- **{name}**: 期間リターン {row['Return']:.2%}、期間内MaxDD {row['MaxDDWithinPeriod']:.2%}"
+            )
+    formal = common.loc[FORMAL_BASELINE]
+    sp500 = common.loc["SP500"]
+    assessment = (
+        "同一期間では、正式基準はSP500より低いボラティリティとMaxDDを示した。"
+        if formal["Volatility"] < sp500["Volatility"] and abs(formal["MaxDD"]) < abs(sp500["MaxDD"])
+        else "同一期間では、正式基準がSP500より低いボラティリティとMaxDDを同時には示さなかった。"
+    )
+    report = f"""# L.U.M.U.S.-8 ex-Alpha / VT置換版 バックテスト・レポート
+
+## 位置づけと検証目的
+
+`{FORMAL_BASELINE}` は **L.U.M.U.S.-8完成版ではなく、Alpha Engine 15%をVTで置換した基準ポートフォリオ** である。Alpha Engineを完全削除してCore 85%を100%へ正規化しない理由は、Alpha Engineが「本来VTで持ってもよい成長枠15%の代替戦略」として設計されているためである。
+
+本検証の目的は、Alpha Engineなしでもインデックス級のリターンに近づきつつ、明らかに低いボラティリティと最大ドローダウン（MDD）を維持できるかを研究することである。これは投資助言ではなく、ポートフォリオ設計検証用のバックテストである。
+
+## 方法と共通比較期間
+
+- 月次で目標比率へリバランスし、調整後終値を利用した。
+- 現金代替はSHY、金はGLD、不動産はXLRE、暗号資産はBTC-USD 3%とした。
+- 全戦略の公平比較期間は、正式基準に必要なBTC-USD、BNDX、XLREを含む全資産が利用可能な **{start}〜{end}** とした。
+- `metrics.csv` は各戦略固有の利用可能期間、`common_period_metrics.csv` は上記共通期間を示す。
+- 無リスク金利、税、売買コスト、スリッページは考慮していない。
+
+## 同一期間の主要評価
+
+{chr(10).join(comparison_lines)}
+
+{assessment} CAGR、Volatility、MaxDD、Sharpe、Calmarの組み合わせから、リターン接近度と防御力のトレードオフを評価すべきである。VT単体はポートフォリオ構成資産として含まれるが、比較対象として指定されたSP500を株式インデックスの代表ベンチマークに用いた。
+
+## 2022年（株債同時下落局面）
+
+### 年次リターン
+{chr(10).join(year_lines) if year_lines else '- 2022年データなし'}
+
+### 期間内成績
+{chr(10).join(stress_lines) if stress_lines else '- 2022年データなし'}
+
+60/40およびDalio All Weatherとの比較では、年次リターンだけでなく期間内MaxDDも併せて防御力を判定する。
+
+## 旧サンプル比率との違い
+
+- `{FORMAL_BASELINE}` が今回の正式な評価対象で、比率合計は100%。VT 30%、BNDX 7.5%、XLRE 10%、BTC-USD 3%など、ex-Alpha / VT置換設計を直接表す。
+- `LUMUS_CORE_WITH_BTC` と `LUMUS_XLRE` は **旧サンプル比率**。元の比率合計90%をバックテスト時に正規化し、BTC 5%や旧来の債券・実物資産配分を含むため、正式基準ではない。
+
+## 解釈上の注意
+
+ETFの設定時期により共通期間は限定され、過去の成績は将来を保証しない。BTCを含むため価格データ品質とリバランス仮定にも結果は左右される。詳細値はCSV成果物を参照すること。
+"""
+    (output_dir / "lumus_ex_alpha_vt_replaced_report.md").write_text(report, encoding="utf-8")
+
+
+def concise_assessment(common: pd.DataFrame) -> str:
+    formal, sp500 = common.loc[FORMAL_BASELINE], common.loc["SP500"]
+    return (
+        f"{FORMAL_BASELINE}: CAGR {formal['CAGR']:.2%} vs SP500 {sp500['CAGR']:.2%}; "
+        f"Volatility {formal['Volatility']:.2%} vs {sp500['Volatility']:.2%}; "
+        f"MaxDD {formal['MaxDD']:.2%} vs {sp500['MaxDD']:.2%}. "
+        "Alpha EngineをVTで置換した研究用基準として、リターン接近度と防御力を評価してください。"
+    )
+
+
 def run_backtest(raw_prices: pd.DataFrame, output_dir: Path) -> dict[str, pd.DataFrame]:
     output_dir.mkdir(parents=True, exist_ok=True)
     prices, coverage = prepare_prices(raw_prices)
@@ -488,18 +586,19 @@ def run_backtest(raw_prices: pd.DataFrame, output_dir: Path) -> dict[str, pd.Dat
     equities = pd.DataFrame({name: result.equity for name, result in results.items()})
     tables = {
         "metrics": pd.DataFrame({name: metrics(result) for name, result in results.items()}).T,
-        "annual_returns": annual_returns({name: result.equity for name, result in results.items()}),
-        "stress_periods": stress_analysis({name: result.equity for name, result in results.items()}),
+        "portfolio_period_annual_returns": annual_returns({name: result.equity for name, result in results.items()}),
+        "portfolio_period_stress_periods": stress_analysis({name: result.equity for name, result in results.items()}),
         "risk_contributions": risk_contributions(prices, PORTFOLIOS),
         "data_coverage": coverage,
         "equity_curves": equities,
+        "drawdowns": equities / equities.cummax() - 1.0,
         "annual_asset_returns": annual_asset_returns(prices),
         "contribution_by_stress_period": contribution_by_period(prices, STRESS_PERIODS),
         "contribution_2022": contribution_by_period(prices, {"INFLATION_2022": STRESS_PERIODS["INFLATION_2022"]}),
     }
-    # Preserve the original benchmark comparison at the BTC portfolio inception.
-    # The VNQ-versus-XLRE audit has its own fair common-period metrics table.
-    common_start = max(results[name].start for name in CORE_COMPARISON_PORTFOLIOS)
+    # Fix every strategy to the formal BTC-enabled baseline inception. This may be
+    # later than BTC inception because BNDX and XLRE must also be available.
+    common_start = results[FORMAL_BASELINE].start
     common_results = {
         name: backtest_portfolio(prices.loc[common_start:], weights)
         for name, weights in PORTFOLIOS.items()
@@ -507,6 +606,11 @@ def run_backtest(raw_prices: pd.DataFrame, output_dir: Path) -> dict[str, pd.Dat
     tables["common_period_metrics"] = pd.DataFrame(
         {name: metrics(result) for name, result in common_results.items()}
     ).T
+    common_equities = {name: result.equity for name, result in common_results.items()}
+    tables["annual_returns"] = annual_returns(common_equities)
+    common_stress = stress_analysis(common_equities)
+    tables["stress_periods"] = common_stress
+    tables["comparison_2022"] = common_stress.loc["INFLATION_2022"].copy()
     tables.update(real_estate_variant_audit(prices, results, output_dir))
     correlation, clusters = correlation_analysis(prices, output_dir)
     tables["correlation_matrix"] = correlation
@@ -515,6 +619,7 @@ def run_backtest(raw_prices: pd.DataFrame, output_dir: Path) -> dict[str, pd.Dat
         if filename not in {"correlation_matrix", "cluster_results"}:
             table.to_csv(output_dir / f"{filename}.csv")
     save_plots(equities, output_dir)
+    write_ex_alpha_report(tables, output_dir)
     return tables
 
 
@@ -527,13 +632,19 @@ def main() -> None:
     tickers = sorted({ticker for weights in PORTFOLIOS.values() for ticker in weights})
     raw_prices = download_prices(tickers, args.start, args.end, args.output_dir / "cache")
     tables = run_backtest(raw_prices, args.output_dir)
-    print("\n=== Backtest metrics ===")
+    print("\n=== 1. Backtest metrics table ===")
     print(tables["metrics"].to_string())
-    print("\n=== Annual returns ===")
+    print("\n=== 2. Common-period metrics table ===")
+    print(tables["common_period_metrics"].to_string())
+    print("\n=== 3. Annual returns table (%) ===")
     print((tables["annual_returns"] * 100).round(2).to_string())
-    print(f"\nCSV files and plots saved under: {args.output_dir.resolve()}")
+    print("\n=== 4. 2022 comparison table ===")
+    print(tables["comparison_2022"].to_string())
+    print(f"\n=== 5. Artifacts: {args.output_dir.resolve()} ===")
     for artifact in sorted(path.name for path in args.output_dir.iterdir() if path.is_file()):
         print(f"  - {artifact}")
+    print("\n=== 6. Concise assessment ===")
+    print(concise_assessment(tables["common_period_metrics"]))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from lumus8_backtest import (
+    FORMAL_BASELINE,
     LUMUS_ASSETS,
     PORTFOLIOS,
     REAL_ESTATE_AUDIT_ASSETS,
@@ -15,6 +16,7 @@ from lumus8_backtest import (
     prepare_prices,
     real_estate_variant_audit,
     risk_contributions,
+    run_backtest,
     stress_analysis,
 )
 
@@ -111,3 +113,28 @@ def test_real_estate_variant_audit_compares_vnq_and_xlre(tmp_path):
     for stem in ["lumus_vnq", "lumus_xlre"]:
         assert (tmp_path / f"{stem}_correlation_matrix.csv").is_file()
         assert (tmp_path / f"{stem}_cluster_dendrogram.png").is_file()
+
+
+def test_formal_ex_alpha_baseline_is_fully_allocated_and_primary_artifacts_are_written(tmp_path):
+    assert np.isclose(sum(PORTFOLIOS[FORMAL_BASELINE].values()), 1.0)
+    assert PORTFOLIOS[FORMAL_BASELINE]["VT"] == 0.30
+    assert PORTFOLIOS[FORMAL_BASELINE]["BTC-USD"] == 0.03
+
+    generator = np.random.default_rng(21)
+    dates = pd.bdate_range("2021-12-30", "2023-01-06")
+    tickers = sorted({ticker for weights in PORTFOLIOS.values() for ticker in weights})
+    returns = generator.normal(0.0001, 0.004, (len(dates), len(tickers)))
+    raw = pd.DataFrame(100 * np.cumprod(1 + returns, axis=0), index=dates, columns=tickers)
+    tables = run_backtest(raw, tmp_path)
+
+    assert tables["common_period_metrics"].loc[FORMAL_BASELINE, "StartDate"] == dates[0]
+    assert 2022 in tables["annual_returns"].index
+    for filename in [
+        "metrics.csv", "common_period_metrics.csv", "annual_returns.csv",
+        "equity_curves.csv", "drawdowns.csv", "equity_curves.png", "drawdowns.png",
+        "stress_periods.csv", "comparison_2022.csv", "lumus_ex_alpha_vt_replaced_report.md",
+    ]:
+        assert (tmp_path / filename).is_file()
+    report = (tmp_path / "lumus_ex_alpha_vt_replaced_report.md").read_text(encoding="utf-8")
+    assert "Alpha Engine 15%をVTで置換した基準ポートフォリオ" in report
+    assert "旧サンプル比率" in report
