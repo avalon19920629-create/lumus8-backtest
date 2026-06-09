@@ -1,6 +1,6 @@
 # L.U.M.U.S.-8 Core Backtest
 
-`lumus8_backtest.py` compares SPY, a 60/40 portfolio, a Dalio-style All Weather portfolio, and L.U.M.U.S.-8 Core both with and without BTC. It downloads adjusted prices with `yfinance`, runs daily valuation with month-end target-weight rebalancing, and saves reproducible CSV reports and PNG charts.
+`lumus8_backtest.py` compares SPY, a 60/40 portfolio, a Dalio-style All Weather portfolio, and the formal `LUMUS_EX_ALPHA_VT_REPLACED` baseline, while retaining legacy L.U.M.U.S.-8 sample allocations. It downloads adjusted prices with `yfinance`, runs daily valuation with month-end target-weight rebalancing, and saves reproducible CSV reports and PNG charts.
 
 ## Run
 
@@ -15,7 +15,7 @@ python lumus8_backtest.py --start 2005-01-01 --output-dir output
 - Each ticker is downloaded separately and retried up to three times. Successful downloads are cached under the output directory; the cache is used as a fallback after a later provider failure.
 - Prices are never backfilled before inception or after the final observation. Only internal gaps of up to five observations are forward-filled and disclosed in `data_coverage.csv`.
 - SPY trading sessions are the valuation calendar. BTC weekend moves are captured cumulatively on the next SPY trading day, avoiding artificial zero-return ETF weekend rows in annualized statistics.
-- Every portfolio starts at its own first common valid date. Consequently, the BTC version starts later than the ETF-only variants. Compare start dates in `metrics.csv` before interpreting relative final values; use `common_period_metrics.csv` for an apples-to-apples comparison from the BTC portfolio inception.
+- Every portfolio starts at its own first common valid date in `metrics.csv`. Fair comparisons in `common_period_metrics.csv` and `annual_returns.csv` use the formal BTC-enabled `LUMUS_EX_ALPHA_VT_REPLACED` inception, when BTC-USD, BNDX, XLRE, and all other required assets are available.
 - The original L.U.M.U.S.-8 allocations total 90%. The script normalizes them to 100%; the BTC-free variant removes BTC and normalizes the remaining allocations.
 
 ## Outputs
@@ -23,9 +23,14 @@ python lumus8_backtest.py --start 2005-01-01 --output-dir output
 The output directory contains:
 
 - `metrics.csv`: CAGR, volatility, Sharpe, Sortino, Calmar, worst year, maximum drawdown peak/trough and recovery dates, and recovery durations.
-- `common_period_metrics.csv`: the same metrics with every strategy fixed to the BTC portfolio inception for a fair comparison.
-- `annual_returns.csv`: calendar-year returns.
-- `stress_periods.csv`: portfolio return and within-period maximum drawdown for 2008, 2020, and 2022.
+- `common_period_metrics.csv`: the same metrics with every strategy fixed to the formal ex-Alpha baseline inception for a fair comparison.
+- `annual_returns.csv`: common-period calendar-year returns.
+- `portfolio_period_annual_returns.csv`: calendar-year returns over each portfolio’s individually available period.
+- `drawdowns.csv`: drawdown series for every portfolio.
+- `comparison_2022.csv`: common-period 2022 return and within-year drawdown comparison.
+- `lumus_ex_alpha_vt_replaced_report.md`: Japanese research report centered on the formal ex-Alpha / VT-replaced baseline; `LUMUS_CORE_WITH_BTC` and `LUMUS_XLRE` are explicitly labeled legacy sample allocations.
+- `stress_periods.csv`: common-period portfolio return and within-period maximum drawdown for 2008, 2020, and 2022.
+- `portfolio_period_stress_periods.csv`: the same stress table over each portfolio’s individually available history.
 - `risk_contributions.csv`: covariance-based ex-post volatility contributions based on each portfolio's available history.
 - `data_coverage.csv`: ticker availability and gap-fill disclosure.
 - `equity_curves.csv`, `equity_curves.png`, and `drawdowns.png`: portfolio histories and saved charts.
