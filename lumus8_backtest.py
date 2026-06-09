@@ -54,6 +54,50 @@ PORTFOLIOS: dict[str, dict[str, float]] = {
         "VT": 0.25, "IEF": 0.10, "TLT": 0.12, "TIP": 0.10, "GLD": 0.10,
         "XLRE": 0.06, "DBC": 0.07, "SHY": 0.05, "BTC-USD": 0.05,
     },
+    PORTFOLIOS: dict[str, dict[str, float]] = {
+    "SP500": {"SPY": 1.0},
+    "60_40": {"SPY": 0.60, "IEF": 0.40},
+    "DALIO_AW": {...},
+
+    "LUMUS_EX_ALPHA_VT_REPLACED": {...},
+    "LUMUS_GROWTH_SPY_QQQ_50_50": {...},
+
+    "TRINITY_CURRENT_PROXY_BTC_ONLY": {
+        "VT": 0.326000,
+        "BNDX": 0.061500,
+        "TLT": 0.102500,
+        "TIP": 0.082000,
+        "GLD": 0.082000,
+        "XLRE": 0.082000,
+        "DBC": 0.041000,
+        "SHY": 0.098400,
+        "BTC-USD": 0.124600,
+    },
+
+    "TRINITY_ATTACK_PROXY_BTC_ONLY": {
+        "VT": 0.408599,
+        "BNDX": 0.003930,
+        "TLT": 0.055655,
+        "TIP": 0.116508,
+        "GLD": 0.153713,
+        "XLRE": 0.023482,
+        "DBC": 0.040520,
+        "SHY": 0.057096,
+        "BTC-USD": 0.140496,
+    },
+
+    "TRINITY_ROBUST_PROXY_BTC_ONLY": {
+        "VT": 0.300731,
+        "BNDX": 0.056854,
+        "TLT": 0.055064,
+        "TIP": 0.132002,
+        "GLD": 0.142783,
+        "XLRE": 0.015085,
+        "DBC": 0.048679,
+        "SHY": 0.111133,
+        "BTC-USD": 0.137671,
+    },
+}
 }
 
 FORMAL_BASELINE = "LUMUS_EX_ALPHA_VT_REPLACED"
