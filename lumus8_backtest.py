@@ -29,6 +29,7 @@ PORTFOLIOS: dict[str, dict[str, float]] = {
     "SP500": {"SPY": 1.0},
     "60_40": {"SPY": 0.60, "IEF": 0.40},
     "DALIO_AW": {"SPY": 0.30, "TLT": 0.40, "IEF": 0.15, "GLD": 0.075, "DBC": 0.075},
+    "LUMUS_GROWTH_SPY_QQQ_50_50": {"SPY": 0.50, "QQQ": 0.50},
     # Formal ex-Alpha baseline: replace the 15% Alpha Engine growth sleeve with VT.
     "LUMUS_EX_ALPHA_VT_REPLACED": {
         "VT": 0.30, "BNDX": 0.075, "TLT": 0.125, "TIP": 0.10, "GLD": 0.10,

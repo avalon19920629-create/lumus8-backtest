@@ -179,3 +179,23 @@ The sweep writes `conditional_threshold_summary_report.md`, metrics, rebalance a
 tax-loss events, annual returns, equity/drawdown CSVs, and PNG charts. Real-data
 execution requires an environment that can connect to Yahoo Finance; synthetic-price
 tests validate the sweep and artifact generation when provider access is unavailable.
+
+## Constrained L.U.M.U.S.-8 allocation optimization research
+
+`lumus8_optimization.py` searches a deterministic sample of feasible allocations for the
+nine-asset L.U.M.U.S.-8 research universe. It applies the documented asset and group
+bounds, selects max-Sharpe, max-Sortino, max-Calmar, max-CAGR-with-MDD-limit, and
+min-volatility-with-CAGR-target candidates, then builds a robust convex-average candidate.
+Search ranking uses daily constant-weight returns for tractability; all published candidate
+metrics use the repository's monthly-rebalanced simulator. This is in-sample portfolio
+design research, not investment advice or a claim of future-optimal weights.
+
+```bash
+python lumus8_optimization.py --start 2015-10-08 --end 2026-06-10 \
+  --samples 5000 --output-dir output
+```
+
+The command writes `optimized_weights.csv`, optimized metric/annual/equity/drawdown/2022
+and SP500-delta tables, `optimized_report.md`, and the requested efficient-frontier,
+equity-curve, and drawdown charts. Increase `--samples` for a broader search; compare
+multiple seeds and add walk-forward validation before drawing allocation conclusions.
