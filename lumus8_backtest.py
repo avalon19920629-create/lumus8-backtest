@@ -62,41 +62,6 @@ PORTFOLIOS: dict[str, dict[str, float]] = {
     "LUMUS_EX_ALPHA_VT_REPLACED": {...},
     "LUMUS_GROWTH_SPY_QQQ_50_50": {...},
 
-    "TRINITY_CURRENT_PROXY_BTC_ONLY": {
-        "VT": 0.326000,
-        "BNDX": 0.061500,
-        "TLT": 0.102500,
-        "TIP": 0.082000,
-        "GLD": 0.082000,
-        "XLRE": 0.082000,
-        "DBC": 0.041000,
-        "SHY": 0.098400,
-        "BTC-USD": 0.124600,
-    },
-
-    "TRINITY_ATTACK_PROXY_BTC_ONLY": {
-        "VT": 0.408599,
-        "BNDX": 0.003930,
-        "TLT": 0.055655,
-        "TIP": 0.116508,
-        "GLD": 0.153713,
-        "XLRE": 0.023482,
-        "DBC": 0.040520,
-        "SHY": 0.057096,
-        "BTC-USD": 0.140496,
-    },
-
-    "TRINITY_ROBUST_PROXY_BTC_ONLY": {
-        "VT": 0.300731,
-        "BNDX": 0.056854,
-        "TLT": 0.055064,
-        "TIP": 0.132002,
-        "GLD": 0.142783,
-        "XLRE": 0.015085,
-        "DBC": 0.048679,
-        "SHY": 0.111133,
-        "BTC-USD": 0.137671,
-    },
 }
 }
 
